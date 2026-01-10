@@ -22,7 +22,7 @@ export const DiagnosisPatients: React.FC = () => {
         PatientVisitsService.getAll(),
         PatientsService.getAll()
       ]);
-      setVisits(visitsData.filter(v => v.diagnosisType));
+      setVisits(visitsData.filter(v => v.serviceType || v.diagnosisType));
       setPatients(patientsData);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -40,15 +40,15 @@ export const DiagnosisPatients: React.FC = () => {
     return patients.find(p => p.id === patientId);
   };
 
-  const getDiagnosisColor = (type?: string) => {
+  const getServiceTypeColor = (type?: string) => {
     switch (type) {
-      case 'new_patient':
+      case 'new_visit':
         return {
           bg: 'bg-green-50',
           border: 'border-green-200',
           badge: 'bg-green-500',
           text: 'text-green-700',
-          label: 'New Patient'
+          label: 'New Visit'
         };
       case 'followup':
         return {
@@ -58,13 +58,13 @@ export const DiagnosisPatients: React.FC = () => {
           text: 'text-yellow-700',
           label: 'Follow-up'
         };
-      case 'admission':
+      case 'hospital_admission':
         return {
           bg: 'bg-red-50',
           border: 'border-red-200',
           badge: 'bg-red-500',
           text: 'text-red-700',
-          label: 'Admission for Patients'
+          label: 'Hospital Admission'
         };
       default:
         return {
@@ -86,7 +86,11 @@ export const DiagnosisPatients: React.FC = () => {
       patient?.nationalIdNumber?.toLowerCase().includes(searchLower) ||
       visit.centerName?.toLowerCase().includes(searchLower);
 
-    const matchesFilter = filterType === 'all' || visit.diagnosisType === filterType;
+    const visitServiceType = visit.serviceType ||
+      (visit.diagnosisType === 'new_patient' ? 'new_visit' :
+       visit.diagnosisType === 'admission' ? 'hospital_admission' :
+       visit.diagnosisType);
+    const matchesFilter = filterType === 'all' || visitServiceType === filterType;
 
     return matchesSearch && matchesFilter;
   });
@@ -97,9 +101,9 @@ export const DiagnosisPatients: React.FC = () => {
 
   const stats = {
     total: visits.length,
-    newPatient: visits.filter(v => v.diagnosisType === 'new_patient').length,
-    followup: visits.filter(v => v.diagnosisType === 'followup').length,
-    admission: visits.filter(v => v.diagnosisType === 'admission').length,
+    newVisit: visits.filter(v => v.serviceType === 'new_visit' || v.diagnosisType === 'new_patient').length,
+    followup: visits.filter(v => v.serviceType === 'followup' || v.diagnosisType === 'followup').length,
+    hospitalAdmission: visits.filter(v => v.serviceType === 'hospital_admission' || v.diagnosisType === 'admission').length,
   };
 
   if (loading) {
@@ -113,8 +117,8 @@ export const DiagnosisPatients: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-800">Diagnosis Patients</h2>
-        <p className="text-gray-600">View patients categorized by diagnosis type</p>
+        <h2 className="text-2xl font-bold text-gray-800">Patient Service Types</h2>
+        <p className="text-gray-600">View patients categorized by service type</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -125,10 +129,10 @@ export const DiagnosisPatients: React.FC = () => {
 
         <div className="bg-green-50 rounded-lg border border-green-200 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-1">
-            <div className="text-sm text-green-700">New Patients</div>
+            <div className="text-sm text-green-700">New Visits</div>
             <div className="h-3 w-3 rounded-full bg-green-500"></div>
           </div>
-          <div className="text-2xl font-bold text-green-800">{stats.newPatient}</div>
+          <div className="text-2xl font-bold text-green-800">{stats.newVisit}</div>
         </div>
 
         <div className="bg-yellow-50 rounded-lg border border-yellow-200 p-4 shadow-sm">
@@ -141,10 +145,10 @@ export const DiagnosisPatients: React.FC = () => {
 
         <div className="bg-red-50 rounded-lg border border-red-200 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-1">
-            <div className="text-sm text-red-700">Admissions</div>
+            <div className="text-sm text-red-700">Hospital Admissions</div>
             <div className="h-3 w-3 rounded-full bg-red-500"></div>
           </div>
-          <div className="text-2xl font-bold text-red-800">{stats.admission}</div>
+          <div className="text-2xl font-bold text-red-800">{stats.hospitalAdmission}</div>
         </div>
       </div>
 
@@ -167,16 +171,20 @@ export const DiagnosisPatients: React.FC = () => {
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
           >
             <option value="all">All Types</option>
-            <option value="new_patient">New Patient</option>
+            <option value="new_visit">New Visit</option>
             <option value="followup">Follow-up</option>
-            <option value="admission">Admission</option>
+            <option value="hospital_admission">Hospital Admission</option>
           </select>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredVisits.map((visit) => {
-          const colors = getDiagnosisColor(visit.diagnosisType);
+          const serviceType = visit.serviceType ||
+            (visit.diagnosisType === 'new_patient' ? 'new_visit' :
+             visit.diagnosisType === 'admission' ? 'hospital_admission' :
+             visit.diagnosisType);
+          const colors = getServiceTypeColor(serviceType);
           const patient = getPatientDetails(visit.patientId);
 
           return (
@@ -202,15 +210,12 @@ export const DiagnosisPatients: React.FC = () => {
                   <span className={`font-medium ${colors.text} text-xs`}>{colors.label}</span>
                 </div>
 
-                {visit.diagnosisType && (
+                {serviceType && (
                   <div className="mt-2 p-2 bg-white bg-opacity-50 rounded border border-gray-200">
                     <div className="text-xs">
-                      <span className="text-gray-500">Visit Diagnosis Type: </span>
+                      <span className="text-gray-500">Service Type: </span>
                       <span className="font-semibold text-gray-800">
-                        {visit.diagnosisType === 'new_patient' ? 'New Patient' :
-                         visit.diagnosisType === 'followup' ? 'Follow-up' :
-                         visit.diagnosisType === 'admission' ? 'Admission for Patients' :
-                         visit.diagnosisType}
+                        {colors.label}
                       </span>
                     </div>
                   </div>

@@ -84,10 +84,11 @@ export const PatientVisitsManager: React.FC = () => {
     return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
-  const formatDiagnosisType = (type?: string) => {
+  const formatServiceType = (type?: string) => {
     if (!type) return null;
-    if (type === 'admission') return 'Admission for Patients';
+    if (type === 'hospital_admission') return 'Hospital Admission';
     if (type === 'new_visit') return 'New Visit';
+    if (type === 'followup') return 'Follow-up';
     return type;
   };
 
@@ -162,18 +163,38 @@ export const PatientVisitsManager: React.FC = () => {
                 </div>
               )}
 
-              {visit.diagnosisType && (
+              {visit.serviceType && (
                 <div className="flex items-center text-gray-600">
                   <FileText className="h-4 w-4 mr-2 text-gray-400" />
-                  <span className="text-xs font-medium">{formatDiagnosisType(visit.diagnosisType)}</span>
+                  <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs rounded font-medium">
+                    {formatServiceType(visit.serviceType)}
+                  </span>
                 </div>
               )}
 
-              {visit.diagnosisType === 'admission' && (
+              {visit.vitalStatus && (
+                <div className="flex items-center text-gray-600">
+                  <User className="h-4 w-4 mr-2 text-gray-400" />
+                  <span className={`text-xs font-medium ${visit.vitalStatus === 'Died' ? 'text-red-600' : 'text-green-600'}`}>
+                    Status: {visit.vitalStatus}
+                  </span>
+                </div>
+              )}
+
+              {visit.drugs && visit.drugs.length > 0 && (
                 <div className="flex items-center text-gray-600">
                   <Pill className="h-4 w-4 mr-2 text-blue-500" />
                   <span className="text-xs font-semibold text-blue-700">
-                    Factor Treatments: {getTreatmentCount(visit.patientId)}
+                    Drugs Administered: {visit.drugs.length}
+                  </span>
+                </div>
+              )}
+
+              {visit.inhibitors && visit.inhibitors.length > 0 && (
+                <div className="flex items-center text-gray-600">
+                  <FileText className="h-4 w-4 mr-2 text-purple-500" />
+                  <span className="text-xs font-semibold text-purple-700">
+                    Inhibitor Tests: {visit.inhibitors.length}
                   </span>
                 </div>
               )}
@@ -199,6 +220,13 @@ export const PatientVisitsManager: React.FC = () => {
                     {visit.complaint}
                     {visit.complaint === 'Other' && visit.complaintOther && ` - ${visit.complaintOther}`}
                   </p>
+                </div>
+              )}
+
+              {visit.managementPlan && (
+                <div className="mt-2">
+                  <p className="text-xs text-gray-600 font-medium mb-1">Management Plan:</p>
+                  <p className="text-xs text-gray-500 line-clamp-2">{visit.managementPlan}</p>
                 </div>
               )}
 

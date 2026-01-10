@@ -120,6 +120,21 @@ export interface PatientRequest {
   otherMedicalTests?: OtherMedicalTest[];
 }
 
+export interface InhibitorEntry {
+  inhibitorLevel?: number;
+  inhibitorScreeningDate?: string;
+  result?: 'positive' | 'negative';
+  notes?: string;
+}
+
+export interface VisitDrug {
+  drugType: string;
+  concentration: number;
+  quantity: number;
+  lotNumber?: string;
+  factorId?: number;
+}
+
 export interface PatientVisit {
   id: number;
   patientId: number;
@@ -127,7 +142,7 @@ export interface PatientVisit {
   centerState?: string;
   centerName?: string;
   visitType?: 'telephone_consultation' | 'center_visit';
-  diagnosisType?: 'new_patient' | 'followup' | 'admission';
+  serviceType?: 'new_visit' | 'followup' | 'hospital_admission';
   complaint?: string;
   complaintOther?: string;
   complaintDetails?: string;
@@ -139,6 +154,11 @@ export interface PatientVisit {
   otherTestDates?: string[];
   createdAt?: string;
   otherMedicalTests?: OtherMedicalTest[];
+  vitalStatus?: 'Alive' | 'Died' | 'Unknown';
+  inhibitors?: InhibitorEntry[];
+  managementPlan?: string;
+  drugs?: VisitDrug[];
+  diagnosisType?: 'new_patient' | 'followup' | 'admission' | 'new_visit' | 'hospital_admission';
 }
 
 export interface OtherMedicalTest {
@@ -153,7 +173,7 @@ export interface PatientVisitRequest {
   centerState?: string;
   centerName?: string;
   visitType?: 'telephone_consultation' | 'center_visit';
-  diagnosisType: 'new_patient' | 'followup' | 'admission';
+  serviceType: 'new_visit' | 'followup' | 'hospital_admission';
   contactRelation?: string;
   complaint?: string;
   complaintOther?: string;
@@ -165,6 +185,11 @@ export interface PatientVisitRequest {
   viralScreeningDates?: string[];
   otherTestDates?: string[];
   otherMedicalTests?: OtherMedicalTest[];
+  vitalStatus?: 'Alive' | 'Died' | 'Unknown';
+  inhibitors?: InhibitorEntry[];
+  managementPlan?: string;
+  drugs?: VisitDrug[];
+  diagnosisType?: 'new_patient' | 'followup' | 'admission';
 }
 
 export interface Treatment {

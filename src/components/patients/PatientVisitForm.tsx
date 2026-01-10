@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Search } from 'lucide-react';
-import { PatientVisit, PatientVisitRequest, Patient, TreatmentRequest, Factor } from '../../types/api';
-import { TreatmentsService } from '../../services/treatments';
-import { FactorsService } from '../../services/factors';
+import { X, Search, Plus, Trash2 } from 'lucide-react';
+import { PatientVisit, PatientVisitRequest, Patient, Factor, InhibitorEntry, VisitDrug } from '../../types/api';
 
 interface PatientVisitFormProps {
   visit?: PatientVisit | null;
@@ -68,22 +66,19 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
     centerState: '',
     centerName: '',
     visitType: undefined,
-    diagnosisType: 'followup',
+    serviceType: 'followup',
     complaint: '',
     complaintOther: '',
     complaintDetails: '',
     notes: '',
     enteredBy: '',
+    vitalStatus: 'Alive',
+    managementPlan: '',
+    inhibitors: [],
+    drugs: [],
   });
 
   const [followUpDate, setFollowUpDate] = useState('');
-  const [treatmentData, setTreatmentData] = useState({
-    factorId: 0,
-    lot: '',
-    quantityLot: 0,
-    indicationOfTreatment: '',
-  });
-
   const [patientSearch, setPatientSearch] = useState('');
   const [showPatientDropdown, setShowPatientDropdown] = useState(false);
   const patientSearchRef = useRef<HTMLDivElement>(null);
@@ -93,18 +88,31 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
       const visitDate = visit.visitDate ? new Date(visit.visitDate).toISOString().split('T')[0] : '';
       const patient = patients.find(p => p.id === visit.patientId);
 
+      let serviceType: 'new_visit' | 'followup' | 'hospital_admission' = 'followup';
+      if (visit.serviceType) {
+        serviceType = visit.serviceType;
+      } else if (visit.diagnosisType) {
+        if (visit.diagnosisType === 'new_patient') serviceType = 'new_visit';
+        else if (visit.diagnosisType === 'admission') serviceType = 'hospital_admission';
+        else if (visit.diagnosisType === 'followup') serviceType = 'followup';
+      }
+
       setFormData({
         patientId: visit.patientId,
         visitDate,
         centerState: visit.centerState || '',
         centerName: visit.centerName || '',
         visitType: visit.visitType,
-        diagnosisType: visit.diagnosisType || 'followup',
-            complaint: visit.complaint || '',
+        serviceType,
+        complaint: visit.complaint || '',
         complaintOther: visit.complaintOther || '',
         complaintDetails: visit.complaintDetails || '',
         notes: visit.notes || '',
         enteredBy: visit.enteredBy || '',
+        vitalStatus: visit.vitalStatus || 'Alive',
+        managementPlan: visit.managementPlan || '',
+        inhibitors: visit.inhibitors || [],
+        drugs: visit.drugs || [],
       });
 
       if (patient) {
@@ -128,62 +136,30 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
     e.preventDefault();
 
     let notesWithFollowUp = formData.notes || '';
-    if (formData.diagnosisType === 'admission' && followUpDate) {
+    if (formData.serviceType === 'hospital_admission' && followUpDate) {
       const followUpText = `\nFollow-up Date: ${new Date(followUpDate).toLocaleDateString()}`;
       notesWithFollowUp = notesWithFollowUp ? `${notesWithFollowUp}${followUpText}` : followUpText.trim();
     }
 
-    const submitData: any = {
+    const submitData: PatientVisitRequest = {
       patientId: formData.patientId,
       visitDate: new Date(formData.visitDate).toISOString(),
       centerState: formData.centerState,
       centerName: formData.centerName,
-      diagnosisType: formData.diagnosisType,
+      serviceType: formData.serviceType,
+      visitType: formData.visitType,
       complaint: formData.complaint,
       complaintOther: formData.complaintOther,
       complaintDetails: formData.complaintDetails,
       notes: notesWithFollowUp,
       enteredBy: formData.enteredBy,
+      vitalStatus: formData.vitalStatus,
+      managementPlan: formData.managementPlan,
+      inhibitors: formData.inhibitors && formData.inhibitors.length > 0 ? formData.inhibitors : undefined,
+      drugs: formData.drugs && formData.drugs.length > 0 ? formData.drugs : undefined,
     };
 
-    if (formData.visitType) {
-      submitData.visitType = formData.visitType;
-    }
-
     onSave(submitData);
-
-    if (formData.visitType === 'center_visit' && treatmentData.factorId) {
-      const treatmentRequest: TreatmentRequest = {
-        patientId: formData.patientId,
-        treatmentCenter: formData.centerName || '',
-        treatmentType: 'On-demand',
-        indicationOfTreatment: treatmentData.indicationOfTreatment || '',
-        lot: treatmentData.lot || '',
-        noteDate: new Date(formData.visitDate).toISOString(),
-        quantityLot: treatmentData.quantityLot,
-      };
-
-      try {
-        await TreatmentsService.create(treatmentRequest);
-
-        const selectedFactor = factors.find(f => f.id === treatmentData.factorId);
-        if (selectedFactor && treatmentData.quantityLot > 0) {
-          const newQuantity = selectedFactor.quantity - treatmentData.quantityLot;
-          await FactorsService.update(selectedFactor.id, {
-            name: selectedFactor.name,
-            lotNo: selectedFactor.lotNo,
-            quantity: Math.max(0, newQuantity),
-            expiryDate: selectedFactor.expiryDate,
-            mg: selectedFactor.mg,
-            drugType: selectedFactor.drugType,
-            supplierName: selectedFactor.supplierName,
-            companyName: selectedFactor.companyName,
-          });
-        }
-      } catch (error) {
-        console.error('Error creating treatment or updating factor:', error);
-      }
-    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -200,6 +176,11 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
         ...prev,
         visitType: value as 'telephone_consultation' | 'center_visit' | undefined
       }));
+    } else if (name === 'serviceType') {
+      setFormData(prev => ({
+        ...prev,
+        serviceType: value as 'new_visit' | 'followup' | 'hospital_admission'
+      }));
     } else if (type === 'number') {
       setFormData(prev => ({ ...prev, [name]: value === '' ? 0 : parseInt(value) }));
     } else {
@@ -207,22 +188,73 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
     }
   };
 
-  const handleTreatmentChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
+  const addInhibitor = () => {
+    setFormData(prev => ({
+      ...prev,
+      inhibitors: [...(prev.inhibitors || []), {
+        inhibitorLevel: 0,
+        inhibitorScreeningDate: '',
+        result: undefined,
+        notes: ''
+      }]
+    }));
+  };
 
-    if (name === 'factorId') {
-      const selectedFactor = factors.find(f => f.id === parseInt(value, 10));
-      setTreatmentData(prev => ({
-        ...prev,
-        factorId: parseInt(value, 10) || 0,
-        lot: selectedFactor?.lotNo || '',
-      }));
-    } else {
-      setTreatmentData(prev => ({
-        ...prev,
-        [name]: type === 'number' ? parseInt(value, 10) || 0 : value,
-      }));
-    }
+  const removeInhibitor = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      inhibitors: (prev.inhibitors || []).filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateInhibitor = (index: number, field: keyof InhibitorEntry, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      inhibitors: (prev.inhibitors || []).map((inh, i) =>
+        i === index ? { ...inh, [field]: value } : inh
+      )
+    }));
+  };
+
+  const addDrug = () => {
+    setFormData(prev => ({
+      ...prev,
+      drugs: [...(prev.drugs || []), {
+        drugType: '',
+        concentration: 0,
+        quantity: 0,
+        lotNumber: '',
+        factorId: 0
+      }]
+    }));
+  };
+
+  const removeDrug = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      drugs: (prev.drugs || []).filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateDrug = (index: number, field: keyof VisitDrug, value: any) => {
+    setFormData(prev => {
+      const drugs = [...(prev.drugs || [])];
+      if (field === 'factorId' && value) {
+        const selectedFactor = factors.find(f => f.id === parseInt(value, 10));
+        if (selectedFactor) {
+          drugs[index] = {
+            ...drugs[index],
+            factorId: selectedFactor.id,
+            drugType: selectedFactor.drugType,
+            concentration: selectedFactor.mg,
+            lotNumber: selectedFactor.lotNo
+          };
+        }
+      } else {
+        drugs[index] = { ...drugs[index], [field]: value };
+      }
+      return { ...prev, drugs };
+    });
   };
 
   const availableCenters = formData.centerState ? STATE_CENTERS[formData.centerState] || [] : [];
@@ -238,7 +270,7 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
   });
 
   const handlePatientSelect = (patient: Patient) => {
-    setFormData(prev => ({ ...prev, patientId: patient.id }));
+    setFormData(prev => ({ ...prev, patientId: patient.id, vitalStatus: patient.vitalStatus || 'Alive' }));
     setPatientSearch(`${patient.fullName} - ${patient.nationalIdNumber}`);
     setShowPatientDropdown(false);
   };
@@ -253,7 +285,7 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-white rounded-lg w-full max-w-4xl my-8 shadow-xl">
+      <div className="bg-white rounded-lg w-full max-w-5xl my-8 shadow-xl">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-lg z-10">
           <h3 className="text-xl font-semibold text-gray-800">
             {visit ? 'Edit Patient Visit' : 'Add New Patient Visit'}
@@ -309,11 +341,6 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
                     ))}
                   </div>
                 )}
-                {showPatientDropdown && patientSearch && filteredPatients.length === 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-3 text-sm text-gray-500">
-                    No patients found matching "{patientSearch}"
-                  </div>
-                )}
               </div>
 
               <div>
@@ -334,6 +361,23 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Vital Status *
+                </label>
+                <select
+                  name="vitalStatus"
+                  value={formData.vitalStatus || 'Alive'}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                >
+                  <option value="Alive">Alive</option>
+                  <option value="Died">Died</option>
+                  <option value="Unknown">Unknown</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Visit Type *
                 </label>
                 <select
@@ -348,26 +392,26 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
                   <option value="center_visit">Center Visit</option>
                 </select>
               </div>
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Diagnosis Type *
+                  Service Type *
                 </label>
                 <select
-                  name="diagnosisType"
-                  value={formData.diagnosisType}
+                  name="serviceType"
+                  value={formData.serviceType}
                   onChange={handleChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 >
-                  <option value="new_patient">New Patient</option>
+                  <option value="new_visit">New Visit</option>
                   <option value="followup">Follow-up</option>
-                  <option value="admission">Admission for Patients</option>
+                  <option value="hospital_admission">Hospital Admission</option>
                 </select>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Center State *
@@ -400,7 +444,9 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
                   <option value="West Darfur">West Darfur</option>
                 </select>
               </div>
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Center Name *
@@ -420,21 +466,21 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
                   <option value="Other">Other</option>
                 </select>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Entered By *
-              </label>
-              <input
-                type="text"
-                name="enteredBy"
-                value={formData.enteredBy}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                placeholder="Staff name"
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Entered By *
+                </label>
+                <input
+                  type="text"
+                  name="enteredBy"
+                  value={formData.enteredBy}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  placeholder="Staff name"
+                />
+              </div>
             </div>
           </div>
 
@@ -491,9 +537,224 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
             </div>
           </div>
 
-          {formData.diagnosisType === 'admission' && (
-            <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
-              <h4 className="text-lg font-semibold text-teal-900 mb-4">Follow-up Information</h4>
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h4 className="text-lg font-semibold text-purple-900">Inhibitor Information</h4>
+              <button
+                type="button"
+                onClick={addInhibitor}
+                className="flex items-center space-x-1 px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 text-sm"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Inhibitor</span>
+              </button>
+            </div>
+
+            {formData.inhibitors && formData.inhibitors.length > 0 ? (
+              <div className="space-y-4">
+                {formData.inhibitors.map((inhibitor, index) => (
+                  <div key={index} className="bg-white p-4 rounded-lg border border-purple-200">
+                    <div className="flex justify-between items-center mb-3">
+                      <h5 className="font-medium text-gray-800">Inhibitor #{index + 1}</h5>
+                      <button
+                        type="button"
+                        onClick={() => removeInhibitor(index)}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors duration-200"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Inhibitor Level
+                        </label>
+                        <input
+                          type="number"
+                          value={inhibitor.inhibitorLevel || ''}
+                          onChange={(e) => updateInhibitor(index, 'inhibitorLevel', parseFloat(e.target.value) || 0)}
+                          step="0.01"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          placeholder="Level"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Screening Date
+                        </label>
+                        <input
+                          type="date"
+                          value={inhibitor.inhibitorScreeningDate || ''}
+                          onChange={(e) => updateInhibitor(index, 'inhibitorScreeningDate', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Result
+                        </label>
+                        <select
+                          value={inhibitor.result || ''}
+                          onChange={(e) => updateInhibitor(index, 'result', e.target.value as 'positive' | 'negative' | undefined)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        >
+                          <option value="">Select Result</option>
+                          <option value="positive">Positive</option>
+                          <option value="negative">Negative</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Notes
+                        </label>
+                        <input
+                          type="text"
+                          value={inhibitor.notes || ''}
+                          onChange={(e) => updateInhibitor(index, 'notes', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          placeholder="Additional notes"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 text-center py-4">No inhibitor entries. Click "Add Inhibitor" to add one.</p>
+            )}
+          </div>
+
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h4 className="text-lg font-semibold text-orange-900">Drug Treatment Details</h4>
+              <button
+                type="button"
+                onClick={addDrug}
+                className="flex items-center space-x-1 px-3 py-1 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors duration-200 text-sm"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Drug</span>
+              </button>
+            </div>
+
+            {formData.drugs && formData.drugs.length > 0 ? (
+              <div className="space-y-4">
+                {formData.drugs.map((drug, index) => (
+                  <div key={index} className="bg-white p-4 rounded-lg border border-orange-200">
+                    <div className="flex justify-between items-center mb-3">
+                      <h5 className="font-medium text-gray-800">Drug #{index + 1}</h5>
+                      <button
+                        type="button"
+                        onClick={() => removeDrug(index)}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors duration-200"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Select from Inventory (Optional)
+                        </label>
+                        <select
+                          value={drug.factorId || ''}
+                          onChange={(e) => updateDrug(index, 'factorId', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        >
+                          <option value="">Select a drug from inventory</option>
+                          {factors.filter(f => f.quantity > 0).map(factor => (
+                            <option key={factor.id} value={factor.id}>
+                              {factor.name} - {factor.drugType} ({factor.mg} mg) - Stock: {factor.quantity}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Drug Type *
+                        </label>
+                        <input
+                          type="text"
+                          value={drug.drugType}
+                          onChange={(e) => updateDrug(index, 'drugType', e.target.value)}
+                          required
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          placeholder="e.g., Factor VIII"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Concentration (mg) *
+                        </label>
+                        <input
+                          type="number"
+                          value={drug.concentration}
+                          onChange={(e) => updateDrug(index, 'concentration', parseFloat(e.target.value) || 0)}
+                          required
+                          step="0.01"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          placeholder="Concentration"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Quantity *
+                        </label>
+                        <input
+                          type="number"
+                          value={drug.quantity}
+                          onChange={(e) => updateDrug(index, 'quantity', parseInt(e.target.value) || 0)}
+                          required
+                          min="1"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          placeholder="Quantity"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Lot Number
+                        </label>
+                        <input
+                          type="text"
+                          value={drug.lotNumber || ''}
+                          onChange={(e) => updateDrug(index, 'lotNumber', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          placeholder="Lot number"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 text-center py-4">No drug entries. Click "Add Drug" to add one.</p>
+            )}
+          </div>
+
+          <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+            <h4 className="text-lg font-semibold text-teal-900 mb-4">Management Plan</h4>
+            <textarea
+              name="managementPlan"
+              value={formData.managementPlan}
+              onChange={handleChange}
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+              placeholder="Describe the management plan for this patient visit..."
+            />
+          </div>
+
+          {formData.serviceType === 'hospital_admission' && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+              <h4 className="text-lg font-semibold text-indigo-900 mb-4">Follow-up Information</h4>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Follow-up Date
@@ -508,94 +769,9 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
             </div>
           )}
 
-          {formData.visitType === 'center_visit' && (
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-              <h4 className="text-lg font-semibold text-orange-900 mb-4">Factor Treatment Details</h4>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Indication of Treatment
-                </label>
-                <textarea
-                  name="indicationOfTreatment"
-                  value={treatmentData.indicationOfTreatment}
-                  onChange={handleTreatmentChange}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
-                  placeholder="Enter indication for treatment"
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Medicine/Drug (Optional)
-                </label>
-                <select
-                  name="factorId"
-                  value={treatmentData.factorId}
-                  onChange={handleTreatmentChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                >
-                  <option value={0}>Select a medicine/drug</option>
-                  {factors.filter(f => f.quantity > 0).map(factor => (
-                    <option key={factor.id} value={factor.id}>
-                      {factor.name} - Lot: {factor.lotNo} (Stock: {factor.quantity})
-                    </option>
-                  ))}
-                </select>
-                {factors.filter(f => f.quantity > 0).length === 0 && (
-                  <p className="text-xs text-red-600 mt-1">No medicines/drugs available in stock</p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  Factor distribution is optional for patient visits
-                </p>
-              </div>
-
-              {treatmentData.factorId > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Lot Number
-                    </label>
-                    <input
-                      type="text"
-                      value={treatmentData.lot}
-                      disabled
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Quantity
-                    </label>
-                    <input
-                      type="number"
-                      name="quantityLot"
-                      value={treatmentData.quantityLot}
-                      onChange={handleTreatmentChange}
-                      min="1"
-                      max={factors.find(f => f.id === treatmentData.factorId)?.quantity || 0}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="Enter quantity"
-                    />
-                    {treatmentData.factorId > 0 && (
-                      <p className="text-xs text-blue-600 font-medium mt-1">
-                        Available in stock: {factors.find(f => f.id === treatmentData.factorId)?.quantity || 0} units
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-500 mt-1">
-                      Stock will be decreased when treatment is saved
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Followup Notes
+              Notes
             </label>
             <textarea
               name="notes"
@@ -603,7 +779,7 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
               onChange={handleChange}
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
-              placeholder="Followup notes about the visit"
+              placeholder="Additional notes about the visit"
             />
           </div>
 
