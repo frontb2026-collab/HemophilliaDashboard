@@ -36,6 +36,16 @@ export class PatientsService {
                      patient.inhibitor === true || patient.inhibitor === 'true' ||
                      patient.has_inhibitors === true || patient.has_inhibitors === 'true';
 
+    // Parse inhibitors array if present on the patient record
+    let inhibitors: any[] = [];
+    const inhibitorsField = patient.Inhibitors || patient.inhibitors;
+    if (inhibitorsField && Array.isArray(inhibitorsField)) {
+      inhibitors = inhibitorsField.map((inh: any) => ({
+        inhibitorLevel: inh.InhibitorLevel || inh.inhibitorLevel || inh.inhibitor_level,
+        inhibitorScreeningDate: inh.InhibitorScreeningDate || inh.inhibitorScreeningDate || inh.inhibitor_screening_date,
+      }));
+    }
+
     const hasChronicDiseasesExplicit = patient.HasChronicDiseases === true || patient.HasChronicDiseases === 'true' ||
                                patient.hasChronicDiseases === true || patient.hasChronicDiseases === 'true' ||
                                patient.has_chronic_diseases === true || patient.has_chronic_diseases === 'true';
@@ -116,6 +126,7 @@ export class PatientsService {
       HasInhibitors: inhibitor,
       inhibitorLevel: patient.InhibitorLevel || patient.inhibitorLevel || patient.inhibitor_level,
       inhibitorScreeningDate: patient.InhibitorScreeningDate || patient.inhibitorScreeningDate || patient.inhibitor_screening_date,
+      inhibitors: inhibitors.length > 0 ? inhibitors : undefined,
       HasChronicDiseases: hasChronicDiseases,
       chronicDiseases: chronicDiseases,
       chronicDiseaseOther: patient.ChronicDiseaseOther || patient.chronicDiseaseOther || patient.chronic_disease_other || '',
@@ -180,6 +191,13 @@ export class PatientsService {
       if (patient.inhibitorScreeningDate) {
         transformed.InhibitorScreeningDate = patient.inhibitorScreeningDate;
       }
+    }
+
+    if (patient.inhibitors && patient.inhibitors.length > 0) {
+      transformed.Inhibitors = patient.inhibitors.map(inh => ({
+        InhibitorLevel: inh.inhibitorLevel,
+        InhibitorScreeningDate: inh.inhibitorScreeningDate
+      }));
     }
 
     if (patient.residenceType === 'InsideSudan') {

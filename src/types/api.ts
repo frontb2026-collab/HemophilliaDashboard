@@ -64,6 +64,7 @@ export interface Patient {
   HasInhibitors?: boolean;
   inhibitorLevel?: number;
   inhibitorScreeningDate?: string;
+  inhibitors?: InhibitorEntry[];
   HasChronicDiseases?: boolean;
   chronicDiseases?: string[];
   chronicDiseaseOther?: string;
@@ -111,6 +112,7 @@ export interface PatientRequest {
   HasInhibitors?: boolean;
   inhibitorLevel?: number;
   inhibitorScreeningDate?: string;
+  inhibitors?: InhibitorEntry[];
   HasChronicDiseases?: boolean;
   chronicDiseases?: string[];
   chronicDiseaseOther?: string;
@@ -123,8 +125,6 @@ export interface PatientRequest {
 export interface InhibitorEntry {
   inhibitorLevel?: number;
   inhibitorScreeningDate?: string;
-  result?: 'positive' | 'negative';
-  notes?: string;
 }
 
 export interface VisitDrug {

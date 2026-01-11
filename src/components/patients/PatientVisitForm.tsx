@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Search, Plus, Trash2 } from 'lucide-react';
-import { PatientVisit, PatientVisitRequest, Patient, Factor, InhibitorEntry, VisitDrug } from '../../types/api';
+import { PatientVisit, PatientVisitRequest, Patient, Factor, VisitDrug } from '../../types/api';
 
 interface PatientVisitFormProps {
   visit?: PatientVisit | null;
@@ -72,9 +72,8 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
     complaintDetails: '',
     notes: '',
     enteredBy: '',
-    vitalStatus: 'Alive',
+    vitalStatus: undefined,
     managementPlan: '',
-    inhibitors: [],
     drugs: [],
   });
 
@@ -111,7 +110,7 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
         enteredBy: visit.enteredBy || '',
         vitalStatus: visit.vitalStatus || 'Alive',
         managementPlan: visit.managementPlan || '',
-        inhibitors: visit.inhibitors || [],
+  
         drugs: visit.drugs || [],
       });
 
@@ -153,10 +152,10 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
       complaintDetails: formData.complaintDetails,
       notes: notesWithFollowUp,
       enteredBy: formData.enteredBy,
-      vitalStatus: formData.vitalStatus,
+      ...(formData.vitalStatus !== undefined ? { vitalStatus: formData.vitalStatus } : {}),
       managementPlan: formData.managementPlan,
-      inhibitors: formData.inhibitors && formData.inhibitors.length > 0 ? formData.inhibitors : undefined,
-      drugs: formData.drugs && formData.drugs.length > 0 ? formData.drugs : undefined,
+
+      drugs: formData.visitType === 'center_visit' ? (formData.drugs && formData.drugs.length > 0 ? formData.drugs : undefined) : undefined,
     };
 
     onSave(submitData);
@@ -174,7 +173,8 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
     } else if (name === 'visitType') {
       setFormData(prev => ({
         ...prev,
-        visitType: value as 'telephone_consultation' | 'center_visit' | undefined
+        visitType: value as 'telephone_consultation' | 'center_visit' | undefined,
+        ...(value !== 'center_visit' ? { drugs: undefined } : {})
       }));
     } else if (name === 'serviceType') {
       setFormData(prev => ({
@@ -188,33 +188,7 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
     }
   };
 
-  const addInhibitor = () => {
-    setFormData(prev => ({
-      ...prev,
-      inhibitors: [...(prev.inhibitors || []), {
-        inhibitorLevel: 0,
-        inhibitorScreeningDate: '',
-        result: undefined,
-        notes: ''
-      }]
-    }));
-  };
 
-  const removeInhibitor = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      inhibitors: (prev.inhibitors || []).filter((_, i) => i !== index)
-    }));
-  };
-
-  const updateInhibitor = (index: number, field: keyof InhibitorEntry, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      inhibitors: (prev.inhibitors || []).map((inh, i) =>
-        i === index ? { ...inh, [field]: value } : inh
-      )
-    }));
-  };
 
   const addDrug = () => {
     setFormData(prev => ({
@@ -270,7 +244,7 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
   });
 
   const handlePatientSelect = (patient: Patient) => {
-    setFormData(prev => ({ ...prev, patientId: patient.id, vitalStatus: patient.vitalStatus || 'Alive' }));
+    setFormData(prev => ({ ...prev, patientId: patient.id, ...(visit ? { vitalStatus: patient.vitalStatus || 'Alive' } : {}) }));
     setPatientSearch(`${patient.fullName} - ${patient.nationalIdNumber}`);
     setShowPatientDropdown(false);
   };
@@ -359,22 +333,23 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Vital Status *
-                </label>
-                <select
-                  name="vitalStatus"
-                  value={formData.vitalStatus || 'Alive'}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                >
-                  <option value="Alive">Alive</option>
-                  <option value="Died">Died</option>
-                  <option value="Unknown">Unknown</option>
-                </select>
-              </div>
+              {visit && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Vital Status
+                  </label>
+                  <select
+                    name="vitalStatus"
+                    value={formData.vitalStatus ?? 'Alive'}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  >
+                    <option value="Alive">Alive</option>
+                    <option value="Died">Died</option>
+                    <option value="Unknown">Unknown</option>
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -537,109 +512,21 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
             </div>
           </div>
 
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h4 className="text-lg font-semibold text-purple-900">Inhibitor Information</h4>
-              <button
-                type="button"
-                onClick={addInhibitor}
-                className="flex items-center space-x-1 px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 text-sm"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add Inhibitor</span>
-              </button>
-            </div>
 
-            {formData.inhibitors && formData.inhibitors.length > 0 ? (
-              <div className="space-y-4">
-                {formData.inhibitors.map((inhibitor, index) => (
-                  <div key={index} className="bg-white p-4 rounded-lg border border-purple-200">
-                    <div className="flex justify-between items-center mb-3">
-                      <h5 className="font-medium text-gray-800">Inhibitor #{index + 1}</h5>
-                      <button
-                        type="button"
-                        onClick={() => removeInhibitor(index)}
-                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors duration-200"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Inhibitor Level
-                        </label>
-                        <input
-                          type="number"
-                          value={inhibitor.inhibitorLevel || ''}
-                          onChange={(e) => updateInhibitor(index, 'inhibitorLevel', parseFloat(e.target.value) || 0)}
-                          step="0.01"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                          placeholder="Level"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Screening Date
-                        </label>
-                        <input
-                          type="date"
-                          value={inhibitor.inhibitorScreeningDate || ''}
-                          onChange={(e) => updateInhibitor(index, 'inhibitorScreeningDate', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Result
-                        </label>
-                        <select
-                          value={inhibitor.result || ''}
-                          onChange={(e) => updateInhibitor(index, 'result', e.target.value as 'positive' | 'negative' | undefined)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                        >
-                          <option value="">Select Result</option>
-                          <option value="positive">Positive</option>
-                          <option value="negative">Negative</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Notes
-                        </label>
-                        <input
-                          type="text"
-                          value={inhibitor.notes || ''}
-                          onChange={(e) => updateInhibitor(index, 'notes', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                          placeholder="Additional notes"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500 text-center py-4">No inhibitor entries. Click "Add Inhibitor" to add one.</p>
-            )}
-          </div>
-
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h4 className="text-lg font-semibold text-orange-900">Drug Treatment Details</h4>
-              <button
-                type="button"
-                onClick={addDrug}
-                className="flex items-center space-x-1 px-3 py-1 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors duration-200 text-sm"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add Drug</span>
-              </button>
-            </div>
+          {formData.visitType === 'center_visit' && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-lg font-semibold text-orange-900">Drug Treatment Details</h4>
+                <button
+                  type="button"
+                  onClick={addDrug}
+                  className="flex items-center space-x-1 px-3 py-1 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors duration-200 text-sm"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add Drug</span>
+                </button>
+              </div> 
 
             {formData.drugs && formData.drugs.length > 0 ? (
               <div className="space-y-4">
@@ -739,6 +626,7 @@ export const PatientVisitForm: React.FC<PatientVisitFormProps> = ({
               <p className="text-sm text-gray-500 text-center py-4">No drug entries. Click "Add Drug" to add one.</p>
             )}
           </div>
+          )}
 
           <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
             <h4 className="text-lg font-semibold text-teal-900 mb-4">Management Plan</h4>

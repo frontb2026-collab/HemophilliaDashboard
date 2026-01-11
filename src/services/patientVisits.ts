@@ -31,9 +31,7 @@ export class PatientVisitsService {
     if (inhibitorsField && Array.isArray(inhibitorsField)) {
       inhibitors = inhibitorsField.map((inh: any) => ({
         inhibitorLevel: inh.InhibitorLevel || inh.inhibitorLevel || inh.inhibitor_level,
-        inhibitorScreeningDate: inh.InhibitorScreeningDate || inh.inhibitorScreeningDate || inh.inhibitor_screening_date,
-        result: inh.Result || inh.result,
-        notes: inh.Notes || inh.notes
+        inhibitorScreeningDate: inh.InhibitorScreeningDate || inh.inhibitorScreeningDate || inh.inhibitor_screening_date
       }));
     }
 
@@ -88,9 +86,12 @@ export class PatientVisitsService {
       ComplaintDetails: visit.complaintDetails || '',
       Notes: visit.notes || '',
       EnteredBy: visit.enteredBy || '',
-      VitalStatus: visit.vitalStatus || 'Alive',
       ManagementPlan: visit.managementPlan || '',
     };
+
+    if (visit.vitalStatus !== undefined) {
+      transformed.VitalStatus = visit.vitalStatus;
+    }
 
     if (visit.diagnosisType) {
       transformed.DiagnosisType = visit.diagnosisType;
@@ -111,9 +112,7 @@ export class PatientVisitsService {
     if (visit.inhibitors && visit.inhibitors.length > 0) {
       transformed.Inhibitors = visit.inhibitors.map(inh => ({
         InhibitorLevel: inh.inhibitorLevel,
-        InhibitorScreeningDate: inh.inhibitorScreeningDate,
-        Result: inh.result,
-        Notes: inh.notes || ''
+        InhibitorScreeningDate: inh.inhibitorScreeningDate
       }));
     }
 

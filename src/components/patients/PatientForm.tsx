@@ -139,6 +139,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({
     HasInhibitors: false,
     inhibitorLevel: undefined,
     inhibitorScreeningDate: '',
+    inhibitors: [],
     HasChronicDiseases: false,
     chronicDiseases: [],
     chronicDiseaseOther: '',
@@ -220,6 +221,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({
         HasInhibitors: patient.HasInhibitors === true,
         inhibitorLevel: patient.inhibitorLevel,
         inhibitorScreeningDate,
+        inhibitors: patient.inhibitors || [],
         HasChronicDiseases: hasChronicDiseasesValue,
         chronicDiseases: chronicDiseasesArray,
         chronicDiseaseOther: patient.chronicDiseaseOther || '',
@@ -291,6 +293,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({
       hemophiliaCenterId: 'Hemophilia Center ID',
       severity: 'Severity',
       bloodGroup: 'Blood Group',
+      vitalStatus: 'Vital Status',
       maritalStatus: 'Marital Status',
       occupation: 'Occupation'
     };
@@ -346,7 +349,8 @@ export const PatientForm: React.FC<PatientFormProps> = ({
       testDates: testDatesArray.length > 0 ? testDatesArray : undefined,
       familyHistory: hasFamilyHistory ? formData.familyHistory : null,
       otherMedicalTests: otherTests.length > 0 ? otherTests.filter(test => test.testName && test.testResult) : undefined,
-    };
+      inhibitors: formData.inhibitors && formData.inhibitors.length > 0 ? formData.inhibitors : undefined,
+    }; 
 
     if (hasFactorLevel && (formData.factorPercent !== undefined && formData.factorPercent !== null)) {
       submitData.factorPercent = formData.factorPercent;
@@ -476,6 +480,28 @@ export const PatientForm: React.FC<PatientFormProps> = ({
 
   const removeOtherTest = (index: number) => {
     setOtherTests(otherTests.filter((_, i) => i !== index));
+  };
+
+  // Patient-level inhibitor entries management
+  const addPatientInhibitor = () => {
+    setFormData(prev => ({
+      ...prev,
+      inhibitors: [...(prev.inhibitors || []), { inhibitorLevel: 0, inhibitorScreeningDate: '' }]
+    }));
+  };
+
+  const removePatientInhibitor = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      inhibitors: (prev.inhibitors || []).filter((_, i) => i !== index)
+    }));
+  };
+
+  const updatePatientInhibitor = (index: number, field: keyof InhibitorEntry, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      inhibitors: (prev.inhibitors || []).map((inh, i) => i === index ? { ...inh, [field]: value } : inh)
+    }));
   };
 
   return (
@@ -845,16 +871,12 @@ export const PatientForm: React.FC<PatientFormProps> = ({
                 value={formData.vitalStatus || 'Alive'}
                 onChange={handleChange}
                 required
-                disabled={!patient}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               >
                 <option value="Alive">Alive</option>
                 <option value="Died">Died</option>
                 <option value="Unknown">Unknown</option>
               </select>
-              {!patient && (
-                <p className="text-xs text-gray-500 mt-1">New patients are set to "Alive" by default</p>
-              )}
             </div>
 
           </div>
@@ -949,8 +971,6 @@ export const PatientForm: React.FC<PatientFormProps> = ({
                 <option value="">Select Diagnosis</option>
                 <option value="Hemophilia A">Hemophilia A</option>
                 <option value="Hemophilia B">Hemophilia B</option>
-                <option value="Hemophilia A with inhibitor">Hemophilia A with inhibitor</option>
-                <option value="Hemophilia B with inhibitor">Hemophilia B with inhibitor</option>
                 <option value="Hemophilia A carrier">Hemophilia A carrier</option>
                 <option value="Hemophilia B carrier">Hemophilia B carrier</option>
                 <option value="Acquired hemophilia">Acquired hemophilia</option>
@@ -1092,35 +1112,97 @@ export const PatientForm: React.FC<PatientFormProps> = ({
             </div>
 
             {formData.HasInhibitors && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Inhibitor Screening Date
-                  </label>
-                  <input
-                    type="date"
-                    name="inhibitorScreeningDate"
-                    value={formData.inhibitorScreeningDate}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  />
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Inhibitor Screening Date
+                    </label>
+                    <input
+                      type="date"
+                      name="inhibitorScreeningDate"
+                      value={formData.inhibitorScreeningDate}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Inhibitor Level
+                    </label>
+                    <input
+                      type="number"
+                      name="inhibitorLevel"
+                      value={formData.inhibitorLevel || ''}
+                      onChange={handleChange}
+                      step="0.01"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      placeholder="Inhibitor level"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Inhibitor Level
-                  </label>
-                  <input
-                    type="number"
-                    name="inhibitorLevel"
-                    value={formData.inhibitorLevel || ''}
-                    onChange={handleChange}
-                    step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    placeholder="Inhibitor level"
-                  />
+                {/* Patient-level Inhibitor Records */}
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mt-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-lg font-semibold text-purple-900">Inhibitor Information</h4>
+                    <button
+                      type="button"
+                      onClick={addPatientInhibitor}
+                      className="flex items-center space-x-1 px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 text-sm"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Add Inhibitor</span>
+                    </button>
+                  </div>
+
+                  {formData.inhibitors && formData.inhibitors.length > 0 ? (
+                    <div className="space-y-4">
+                      {formData.inhibitors.map((inhibitor, index) => (
+                        <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
+                          <div className="flex justify-between items-start mb-3">
+                            <h5 className="font-medium text-gray-800">Inhibitor #{index + 1}</h5>
+                            <button
+                              type="button"
+                              onClick={() => removePatientInhibitor(index)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors duration-200"
+                              title="Remove inhibitor"
+                              aria-label={`Remove inhibitor ${index + 1}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">Inhibitor Level</label>
+                              <input
+                                type="number"
+                                value={inhibitor.inhibitorLevel || ''}
+                                onChange={(e) => updatePatientInhibitor(index, 'inhibitorLevel', parseFloat(e.target.value) || 0)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">Screening Date</label>
+                              <input
+                                type="date"
+                                value={inhibitor.inhibitorScreeningDate || ''}
+                                onChange={(e) => updatePatientInhibitor(index, 'inhibitorScreeningDate', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 text-center py-4">No inhibitor entries. Click "Add Inhibitor" to add one.</p>
+                  )}
                 </div>
-              </div>
+              </>
             )}
 
             <div className="mb-4">
